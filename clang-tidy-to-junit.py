@@ -8,7 +8,9 @@ import itertools
 from xml.sax.saxutils import escape
 
 # Create a `ErrorDescription` tuple with all the information we want to keep.
-ErrorDescription = collections.namedtuple('ErrorDescription', 'file line column error description')
+ErrorDescription = collections.namedtuple(
+    'ErrorDescription', 'file line column error error_identifier description')
+
 
 class ClangTidyConverter:
     # All the errors encountered.
@@ -18,8 +20,10 @@ class ClangTidyConverter:
     # Group 1: file path
     # Group 2: line
     # Group 3: column
-    # Group 4: error
-    error_regex = re.compile(r"^([\w\/\.\-\ ]+):(\d+):(\d+): (.+)")
+    # Group 4: error message
+    # Group 5: error identifier
+    error_regex = re.compile(
+        r"^([\w\/\.\-\ ]+):(\d+):(\d+): (.+) (\[[\w\-,\.]+\])$")
 
     # This identifies the main error line (it has a [the-warning-type] at the end)
     # We only create a new error when we encounter one of those.
@@ -33,16 +37,16 @@ class ClangTidyConverter:
         output_file.write("""<?xml version="1.0" encoding="UTF-8" ?>
 <testsuites id="1" name="Clang-Tidy" tests="{error_count}" errors="{error_count}" failures="0" time="0">""".format(error_count=len(self.errors)))
 
-        sorted_errors = sorted(self.errors, key=lambda x:x.file)
+        sorted_errors = sorted(self.errors, key=lambda x: x.file)
 
         # Iterate through the errors, grouped by file.
-        for file, errorIterator in itertools.groupby(sorted_errors, key=lambda x:x.file):
+        for file, errorIterator in itertools.groupby(sorted_errors, key=lambda x: x.file):
             errors = list(errorIterator)
             error_count = len(errors)
 
             # Each file gets a test-suite
             output_file.write("""\n    <testsuite errors="{error_count}" name="{file}" tests="{error_count}" failures="0" time="0">\n"""
-                .format(error_count=error_count, file=file))
+                              .format(error_count=error_count, file=file))
             for error in errors:
                 # Write each error as a test case.
                 output_file.write("""
@@ -50,9 +54,9 @@ class ClangTidyConverter:
             <failure message="{message}">
 {htmldata}
             </failure>
-        </testcase>
-                 """.format(id="line {} char {}".format(error.line, error.column), message=escape(error.error), htmldata=escape(error.description)))
-            output_file.write("    </testsuite>\n")
+        </testcase>""".format(id="[{}/{}] {}".format(error.line, error.column, error.error_identifier), message=escape(error.error),
+                              htmldata=escape(error.description)))
+            output_file.write("\n    </testsuite>\n")
         output_file.write("</testsuites>\n")
 
     def process_error(self, error_array):
@@ -61,12 +65,14 @@ class ClangTidyConverter:
 
         result = self.error_regex.match(error_array[0])
         if result is None:
-            logging.warning('Could not match error_array to regex: %s', error_array)
+            logging.warning(
+                'Could not match error_array to regex: %s', error_array)
             return
 
         # We remove the `basename` from the `file_path` to make prettier filenames in the JUnit file.
         file_path = result.group(1).replace(self.basename, "")
-        error = ErrorDescription(file_path, int(result.group(2)), int(result.group(3)), result.group(4), "\n".join(error_array[1:]))
+        error = ErrorDescription(file_path, int(result.group(2)), int(
+            result.group(3)), result.group(4), result.group(5), "\n".join(error_array[1:]))
         self.errors.append(error)
 
     def convert(self, input_file, output_file):
@@ -90,7 +96,7 @@ class ClangTidyConverter:
                 current_error.append(line)
             else:
                 pass
-        
+
         # If we still have any current_error after we read all the lines,
         # process it.
         if len(current_error) > 0:
@@ -99,10 +105,12 @@ class ClangTidyConverter:
         # Print the junit file.
         self.print_junit_file(output_file)
 
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         logging.error("Usage: %s base-filename-path", sys.argv[0])
-        logging.error("  base-filename-path: Removed from the filenames to make nicer paths.")
+        logging.error(
+            "  base-filename-path: Removed from the filenames to make nicer paths.")
         sys.exit(1)
     converter = ClangTidyConverter(sys.argv[1])
     converter.convert(sys.stdin, sys.stdout)
