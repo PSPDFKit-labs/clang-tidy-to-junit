@@ -54,7 +54,8 @@ class ClangTidyConverter:
             <failure message="{message}">
 {htmldata}
             </failure>
-        </testcase>""".format(id="[{}/{}] {}".format(error.line, error.column, error.error_identifier), message=escape(error.error),
+        </testcase>""".format(id="[{}/{}] {}".format(error.line, error.column, error.error_identifier),
+                              message=escape(error.error, entities={"\"": "&quot;"}),
                               htmldata=escape(error.description)))
             output_file.write("\n    </testsuite>\n")
         output_file.write("</testsuites>\n")
