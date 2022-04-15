@@ -23,7 +23,7 @@ class ClangTidyConverter:
     # Group 4: error message
     # Group 5: error identifier
     error_regex = re.compile(
-        r"^([\w\/\.\-\ ]+):(\d+):(\d+): (.+) (\[[\w\-,\.]+\])$")
+        r"^([\w\/\.\+\-\ ]+):(\d+):(\d+): (.+) (\[[\w\-,\.]+\])$")
 
     # This identifies the main error line (it has a [the-warning-type] at the end)
     # We only create a new error when we encounter one of those.
